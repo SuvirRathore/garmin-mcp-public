@@ -1,0 +1,8 @@
+[project]
+name = "garmin-mcp"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "garth-ng>=1.1.0",
+    "mcp>=2,<3",
+]

@@ -1,0 +1,5 @@
+.garth/
+.venv/
+__pycache__/
+*.pyc
+uv.lock
