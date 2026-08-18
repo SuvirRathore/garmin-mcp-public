@@ -16,7 +16,7 @@ Everything is read-only. The library underneath (`garth-ng`) does expose write e
 
 ### Requirements
 
-macOS or Linux, Python 3.12+, [uv](https://docs.astral.sh/uv/), Claude Desktop, and a Garmin Connect account. This will not work in the Claude mobile app or in claude.ai, because a local stdio server has no URL for them to connect to.
+Python 3.12+, [uv](https://docs.astral.sh/uv/), Claude Desktop, and a Garmin Connect account. The commands below assume a Unix shell, so macOS or Linux; Windows works too, but the paths differ. Claude Desktop itself runs on macOS, Windows, and Linux (beta, on Ubuntu and Debian). This will not work in the Claude mobile app or in claude.ai, because a local stdio server has no URL for them to connect to.
 
 ### Setup
 
@@ -45,7 +45,7 @@ Enter your MFA code if prompted. The OAuth1 token lasts about a year and the OAu
 cd garmin-mcp-public
 uv run python -c "import server; print(server.list_runs(3))"
 uv run python -c "import server; print(server.list_strength(3))"
-uv run python -c "import server; print(server.daily_calories(7)[0])"
+uv run python -c "import server; print(server.daily_calories(7))"
 ```
 
 5. Find the two absolute paths the config needs:
@@ -56,14 +56,14 @@ which uv
 pwd
 ```
 
-6. Create or edit `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `~/.config/Claude/claude_desktop_config.json` on Linux, substituting the two paths from step 5 and change both instances of "YOUR_USERNAME" to your own username:
+6. Create or edit Claude Desktop's config file and paste in the block below, replacing the two paths with the output from step 5. Pasting your real paths also removes both instances of `YOUR_USERNAME`. The file lives at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS and `%APPDATA%\Claude\claude_desktop_config.json` on Windows; on the Linux beta, check Anthropic's Claude Desktop documentation for the current location.
 
 ```json
 {
   "mcpServers": {
     "garmin": {
       "command": "/Users/YOUR_USERNAME/.local/bin/uv",
-      "args": ["--directory", "/Users/YOUR_USERNAME/path/to/garmin-mcp",
+      "args": ["--directory", "/Users/YOUR_USERNAME/path/to/garmin-mcp-public",
                "run", "server.py"]
     }
   }
@@ -76,7 +76,7 @@ Both paths must be absolute. Desktop launches the server with a minimal PATH, so
 
 ### If it does not work
 
-Validate the JSON first, then read the server's stderr:
+Validate the JSON first, then read the server's stderr. These paths are the macOS ones; adjust for your platform:
 
 ```bash
 cd garmin-mcp-public
@@ -88,7 +88,7 @@ Errors on every call usually mean the tokens expired: re-run `auth_setup.py`. Th
 
 ### Notes for anyone extending this
 
-Garmin's Connect API is undocumented and its field names drift, so when something comes back empty, inspect one real object rather than guessing:
+Garmin's Connect API is undocumented and its field names drift, so when something comes back empty, inspect one real object rather than guessing. Save this as `probe.py` in the repo and run it with `uv run probe.py`, rather than pasting it into a shell:
 
 ```python
 import garth
