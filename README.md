@@ -25,15 +25,15 @@ macOS or Linux, Python 3.12+, [uv](https://docs.astral.sh/uv/), Claude Desktop, 
 2. Clone and install:
 
 ```bash
-git clone https://github.com/SuvirRathore/garmin-mcp.git
-cd garmin-mcp
+git clone https://github.com/SuvirRathore/garmin-mcp-public.git
+cd garmin-mcp-public
 uv sync
 ```
 
 3. Authenticate once. This exchanges your password for OAuth tokens saved in `~/.garth`, after which the password is never needed again:
 
 ```bash
-cd garmin-mcp
+cd garmin-mcp-public
 uv run auth_setup.py
 ```
 
@@ -42,7 +42,7 @@ Enter your MFA code if prompted. The OAuth1 token lasts about a year and the OAu
 4. Test the tools directly, before involving Claude. A failure here is an auth or endpoint problem rather than an MCP problem, and it is far quicker to debug at this level than through Desktop's logs:
 
 ```bash
-cd garmin-mcp
+cd garmin-mcp-public
 uv run python -c "import server; print(server.list_runs(3))"
 uv run python -c "import server; print(server.list_strength(3))"
 uv run python -c "import server; print(server.daily_calories(7)[0])"
@@ -51,7 +51,7 @@ uv run python -c "import server; print(server.daily_calories(7)[0])"
 5. Find the two absolute paths the config needs:
 
 ```bash
-cd garmin-mcp
+cd garmin-mcp-public
 which uv
 pwd
 ```
@@ -79,7 +79,7 @@ Both paths must be absolute. Desktop launches the server with a minimal PATH, so
 Validate the JSON first, then read the server's stderr:
 
 ```bash
-cd garmin-mcp
+cd garmin-mcp-public
 uv run python -m json.tool ~/Library/Application\ Support/Claude/claude_desktop_config.json
 tail -50 ~/Library/Logs/Claude/mcp-server-garmin.log
 ```
