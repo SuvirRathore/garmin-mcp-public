@@ -37,7 +37,15 @@ cd garmin-mcp-public
 uv run auth_setup.py
 ```
 
-Enter your MFA code if prompted. The OAuth1 token lasts about a year and the OAuth2 one refreshes itself, so this is roughly an annual chore. Treat `~/.garth` as a credential: anyone holding it can read your entire Garmin account.
+Enter your MFA code if prompted. Treat `~/.garth` as a credential: anyone holding it can read your entire Garmin account.
+
+Expect to repeat this step occasionally. Garmin invalidates the stored tokens from time to time, and always when you change your password, at which point every tool call starts failing at once. Re-running the same command fixes it, substituting the path to your own clone:
+
+```bash
+cd /path/to/garmin-mcp-public
+uv run auth_setup.py
+```
+
 
 4. Test the tools directly, before involving Claude. A failure here is an auth or endpoint problem rather than an MCP problem, and it is far quicker to debug at this level than through Desktop's logs:
 
@@ -84,7 +92,7 @@ uv run python -m json.tool ~/Library/Application\ Support/Claude/claude_desktop_
 tail -50 ~/Library/Logs/Claude/mcp-server-garmin.log
 ```
 
-Errors on every call usually mean the tokens expired: re-run `auth_setup.py`. The "add custom connector" dialog inside Claude is not relevant here, since it expects a remote HTTPS URL.
+Errors on every call, rather than on one tool, almost always mean the tokens expired: re-authenticate as in step 3. The "add custom connector" dialog inside Claude is not relevant here, since it expects a remote HTTPS URL.
 
 ### Notes for anyone extending this
 
