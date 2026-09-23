@@ -3,7 +3,9 @@
 import garth
 from mcp.server.mcpserver import MCPServer
 
-garth.resume("~/.garth")
+import garmin_session
+
+garmin_session.resume()
 mcp = MCPServer("garmin")
 
 
@@ -25,9 +27,11 @@ def _active(total: float | None, bmr: float | None) -> int | None:
 def list_runs(limit: int = 5, start: int = 0) -> list[dict]:
     """Most recent runs: date, run type, distance, time, avg pace, avg/max HR, cadence,
     temperature. start offsets further back into history."""
-    acts = garth.connectapi(
-        "/activitylist-service/activities/search/activities",
-        params={"start": start, "limit": limit, "activityType": "running"},
+    acts = garmin_session.call(
+        lambda: garth.connectapi(
+            "/activitylist-service/activities/search/activities",
+            params={"start": start, "limit": limit, "activityType": "running"},
+        )
     )
     return [
         {
@@ -49,10 +53,12 @@ def list_runs(limit: int = 5, start: int = 0) -> list[dict]:
 def list_strength(limit: int = 5, start: int = 0) -> list[dict]:
     """Most recent strength-training gym sessions: date, session name, duration, sets,
     reps, calories, avg/max HR. start offsets further back into history."""
-    acts = garth.connectapi(
-        "/activitylist-service/activities/search/activities",
-        params={"start": start, "limit": limit * 3,
-                "activityType": "fitness_equipment"},
+    acts = garmin_session.call(
+        lambda: garth.connectapi(
+            "/activitylist-service/activities/search/activities",
+            params={"start": start, "limit": limit * 3,
+                    "activityType": "fitness_equipment"},
+        )
     )
     gym = [
         a for a in acts
@@ -79,7 +85,7 @@ def daily_calories(days: int = 7, end: str | None = None) -> list[dict]:
     """Daily calories burned (total/active/BMR), steps, resting HR, most recent day first.
     days: how many days back to fetch. end: last day as YYYY-MM-DD, defaults to today."""
     out = []
-    for s in garth.DailySummary.list(end, days):
+    for s in garmin_session.call(lambda: garth.DailySummary.list(end, days)):
         total, active = s.total_kilocalories, s.active_kilocalories
         out.append({
             "date": s.calendar_date.isoformat(),

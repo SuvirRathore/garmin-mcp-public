@@ -1,19 +1,26 @@
-"""Garmin session handling with automatic recovery from a stale OAuth2 token.
+"""Garmin session handling that keeps the tokens in ~/.garth current.
 
-garth.resume() loads tokens once at import time. A long-lived process (the MCP
-server under Claude Desktop) therefore keeps an OAuth2 token in memory well past
-its expiry, and the refresh path fails with a bare HTTP 400. Routing every call
-through call() re-reads the token directory and forces a refresh before retrying.
+garth-ng refreshes an expired OAuth2 access token in memory, but a session
+loaded with garth.resume() never writes the refreshed token back to disk. Each
+refresh issues a new refresh token, so after the first one the copy in ~/.garth
+is superseded, and Garmin rejects it. The next time Claude Desktop starts the
+server it loads that superseded token, and every call fails with
+"DI-OAuth2 exchange failed: HTTP Error 400".
+
+call() saves the token whenever it changes. On an auth failure it also reloads
+~/.garth and retries once, so a fresh run of auth_setup.py is picked up by the
+running server without a restart.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 import garth
-from garth.exc import GarthHTTPError
+from garth.exc import GarthException, GarthHTTPError
 
 TOKEN_DIR = Path.home() / ".garth"
 
@@ -23,8 +30,11 @@ T = TypeVar("T")
 
 REAUTH_HINT = (
     f"Garmin tokens in {TOKEN_DIR} are no longer usable. "
-    "Run `uv run auth_setup.py`, then quit and reopen Claude Desktop."
+    "Run `uv run auth_setup.py` in the repo, then retry; no restart is needed."
 )
+
+# garth-ng raises plain GarthException for these, so the message is the only signal.
+_AUTH_MESSAGES = ("No valid OAuth2 token", "No token files found", "Legacy OAuth1 tokens")
 
 
 class GarminAuthError(RuntimeError):
@@ -37,19 +47,40 @@ def resume() -> None:
 
 
 def call(fn: Callable[[], T]) -> T:
-    """Run fn, recovering once from an expired in-memory OAuth2 token."""
+    """Run fn against Garmin, reloading tokens from disk and retrying once on auth failure."""
     try:
-        return fn()
-    except GarthHTTPError as first:
-        log.warning("Garmin call failed (%s); reloading tokens and retrying", first)
+        return _run(fn)
+    except GarthException as exc:
+        if not _is_auth_failure(exc):
+            raise
+        log.warning("Garmin auth failed (%s); reloading %s and retrying", exc, TOKEN_DIR)
 
     try:
         resume()
-        garth.client.refresh_oauth2()
-    except (GarthHTTPError, FileNotFoundError) as exc:
-        raise GarminAuthError(REAUTH_HINT) from exc
+        return _run(fn)
+    except GarthException as exc:
+        if _is_auth_failure(exc):
+            raise GarminAuthError(REAUTH_HINT) from exc
+        raise
 
+
+def _run(fn: Callable[[], T]) -> T:
+    """Refresh up front if expired, run fn, and persist the token if it changed."""
+    before = garth.client.oauth2_token
     try:
+        # Refreshing here, single-threaded, stops DailySummary.list's worker
+        # threads from each refreshing with the same refresh token.
+        token = garth.client.oauth2_token
+        if token is not None and token.expired and not token.refresh_expired:
+            garth.client.refresh_token()
         return fn()
-    except GarthHTTPError as exc:
-        raise GarminAuthError(REAUTH_HINT) from exc
+    finally:
+        if garth.client.oauth2_token is not before:
+            garth.save(str(TOKEN_DIR))
+
+
+def _is_auth_failure(exc: GarthException) -> bool:
+    if isinstance(exc, GarthHTTPError):
+        status = getattr(getattr(exc.error, "response", None), "status_code", None)
+        return exc.msg == "DI-OAuth2 exchange failed" or status == 401
+    return exc.msg.startswith(_AUTH_MESSAGES)

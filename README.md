@@ -94,25 +94,17 @@ tail -50 ~/Library/Logs/Claude/mcp-server-garmin.log
 
 Errors on every call, rather than on one tool, almost always mean the tokens expired: re-authenticate as in step 3. The "add custom connector" dialog inside Claude is not relevant here, since it expects a remote HTTPS URL.
 
-## Troubleshooting
+### Tokens and `DI-OAuth2 exchange failed: HTTP Error 400`
 
-### Calls fail with `DI-OAuth2 exchange failed: HTTP Error 400`
+Garmin's access token is short-lived, and each refresh also issues a new refresh token that supersedes the old one. `garth-ng` refreshes in memory but, when a session is loaded with `garth.resume()`, never writes the result back, so `~/.garth` ends up holding a superseded refresh token. The next time Desktop starts the server, every call fails with `DI-OAuth2 exchange failed: HTTP Error 400`.
 
-The server holds Garmin's OAuth2 token in memory from the moment it starts. Under
-a long-running host such as Claude Desktop that token eventually expires, and the
-refresh attempt comes back as a bare HTTP 400 with no useful detail.
+`garmin_session.py` closes that gap. Every Garmin call goes through `garmin_session.call()`, which saves the token whenever it changes. If a call still fails on authentication, it reloads `~/.garth` and retries once, so re-running `uv run auth_setup.py` fixes a running server without restarting Desktop.
 
-Calls are routed through `garmin_session.call()`, which re-reads `~/.garth` and
-forces a token refresh before retrying once, so most expiries recover silently.
+If you add a tool, route its Garmin call the same way, deferring it with a lambda so the wrapper controls when it runs:
 
-If a call still fails, the OAuth1 token itself has been invalidated and only
-interactive re-auth will fix it:
-
-    uv run auth_setup.py
-
-Then quit and reopen the host application so the server restarts against the new
-tokens. Restarting without re-running `auth_setup.py` will not help, and neither
-will re-running it without restarting.
+```python
+acts = garmin_session.call(lambda: garth.connectapi(path, params=params))
+```
 
 ### Notes for anyone extending this
 
