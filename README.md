@@ -94,6 +94,26 @@ tail -50 ~/Library/Logs/Claude/mcp-server-garmin.log
 
 Errors on every call, rather than on one tool, almost always mean the tokens expired: re-authenticate as in step 3. The "add custom connector" dialog inside Claude is not relevant here, since it expects a remote HTTPS URL.
 
+## Troubleshooting
+
+### Calls fail with `DI-OAuth2 exchange failed: HTTP Error 400`
+
+The server holds Garmin's OAuth2 token in memory from the moment it starts. Under
+a long-running host such as Claude Desktop that token eventually expires, and the
+refresh attempt comes back as a bare HTTP 400 with no useful detail.
+
+Calls are routed through `garmin_session.call()`, which re-reads `~/.garth` and
+forces a token refresh before retrying once, so most expiries recover silently.
+
+If a call still fails, the OAuth1 token itself has been invalidated and only
+interactive re-auth will fix it:
+
+    uv run auth_setup.py
+
+Then quit and reopen the host application so the server restarts against the new
+tokens. Restarting without re-running `auth_setup.py` will not help, and neither
+will re-running it without restarting.
+
 ### Notes for anyone extending this
 
 Garmin's Connect API is undocumented and its field names drift, so when something comes back empty, inspect one real object rather than guessing. Save this as `probe.py` in the repo and run it with `uv run probe.py`, rather than pasting it into a shell:
